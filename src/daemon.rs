@@ -418,7 +418,7 @@ async fn run_watcher(app_state: AppState) -> Result<()> {
         if let Ok(v) = serde_json::from_str::<Value>(&line) {
             if let Some(ws) = v.get("WorkspaceActivated") {
                 if let Some(ws_id) = ws.get("id").and_then(|id| id.as_u64()) {
-                    println!("Workspace switched to: {{ws_id}}");
+                    println!("Workspace switched to: {ws_id}");
 
                     let sticky_snapshot = {
                         let mut sticky = app_state.sticky_windows.lock().await;
