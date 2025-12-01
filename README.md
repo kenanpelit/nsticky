@@ -1,28 +1,31 @@
 # nsticky
 
-`nsticky` is a window management helper tool built on top of [niri](https://github.com/YaLTeR/niri). It focuses on managing **sticky windows** — windows fixed across all workspaces — to enhance your workflow efficiency.
+`nsticky` is a window management helper tool built on top of [niri](https://github.com/YaLTeR/niri). It focuses on managing **sticky windows** — windows fixed across all workspaces — and **staged windows** — windows temporarily moved to a dedicated workspace — to enhance your workflow efficiency.
 
 ## Why?
 
-Niri doesn’t natively support global floating windows.
-This tool forces float windows to persist on every workspace, mimicking the sticky behavior from X11/Wayland compositors like Sway or KWin.
+Niri doesn't natively support global sticky windows.
+This tool allows you to designate certain windows to persist on every workspace, mimicking sticky behavior from other window managers. Additionally, it provides a staging area for temporarily hiding windows without losing track of them.
 
 ## Features
 
 ✨ **Powerful Sticky Window Management:**
-Easily fix windows across all workspaces to keep your most important apps visible at all times.
-
-🔧 **Flexible Controls:**
-Add or remove windows from the sticky list on demand via intuitive CLI commands.
-
-📋 **Real-time Overview:**
-Quickly list all currently sticky windows to stay organized.
-
-⚡ **Instant Toggle:**
-Toggle the sticky state of the currently active window with a single command or shortcut.
+Easily add/remove windows across all workspaces to keep your most important apps visible at all times.
 
 📦 **Window Staging:**
-Temporarily move sticky windows to a dedicated "stage" workspace and restore them to the current workspace when needed.
+Move sticky windows to a dedicated "stage" workspace to temporarily hide them, and restore them when needed.
+
+📋 **Organized CLI Commands:**
+Commands are logically grouped into `sticky` and `stage` categories for intuitive usage.
+
+⚡ **Real-time Toggle:**
+Quickly toggle the sticky/stage state of the currently active window with a single command.
+
+🔍 **State Consistency:**
+Atomic operations ensure internal state stays synchronized with actual window positions.
+
+🔧 **Robust Error Handling:**
+Failures during window operations are handled gracefully with state rollbacks.
 
 ---
 
@@ -87,35 +90,54 @@ spawn-at-startup "nsticky"
 
 ### Command line
 
-Control `nsticky` from the terminal using CLI commands:
+Control `nsticky` from the terminal using grouped CLI commands:
 
+#### Sticky Window Management:
 ```bash
-./target/release/nsticky add <window_id>          # Add a window to the sticky list
-./target/release/nsticky remove <window_id>       # Remove a window from the sticky list
-./target/release/nsticky list                      # List all sticky windows
-./target/release/nsticky toggle-active             # Toggle sticky state of the active window
-./target/release/nsticky stage <window_id>         # Move a sticky window to the "stage" workspace
-./target/release/nsticky stage --all               # Move all sticky windows to the "stage" workspace
-./target/release/nsticky stage --list              # List all currently staged windows
-./target/release/nsticky stage --active            # Move the active sticky window to the "stage" workspace
-./target/release/nsticky unstage <window_id>       # Move a staged window back to the current active workspace
-./target/release/nsticky unstage --all             # Move all staged windows back to the current active workspace
-./target/release/nsticky unstage --active          # Move the active staged window back to the current active workspace
+nsticky sticky add <window_id>          # Add a window to the sticky list
+nsticky sticky remove <window_id>       # Remove a window from the sticky list
+nsticky sticky list                     # List all sticky windows
+nsticky sticky toggle-active            # Toggle sticky state of the active window
 ```
 
-You can also set up a shortcut in `niri`:
+#### Stage Window Management:
+```bash
+nsticky stage list                      # List all currently staged windows
+nsticky stage add <window_id>           # Move a sticky window to the "stage" workspace
+nsticky stage remove <window_id>        # Move a staged window back to the current workspace
+nsticky stage toggle-active             # Toggle stage state of the active window (if in sticky, moves to stage; if in stage, moves back)
+nsticky stage add-all                   # Move all sticky windows to the "stage" workspace
+nsticky stage remove-all                # Move all staged windows back to the current workspace
+```
+
+You can set up shortcuts in `niri`:
 
 ```bash
-Mod+Ctrl+Space { spawn "nsticky" "toggle-active"; }
+Mod+Ctrl+Space { spawn "nsticky" "sticky" "toggle-active"; }
+Mod+Shift+Space { spawn "nsticky" "stage" "toggle-active"; }
 ```
 
 ---
 
 ## Design
 
-`nsticky` communicates with its daemon via a Unix Domain Socket. The CLI client sends commands while the daemon manages sticky window states.
+`nsticky` follows a modular architecture with clear separation of concerns:
 
-The daemon also listens to `niri`’s event stream to automatically handle window movement on workspace switches.
+### Core Modules:
+- **main.rs**: Entry point, starts either CLI or daemon mode
+- **cli.rs**: Parses and sends commands to the daemon
+- **daemon.rs**: Handles incoming CLI commands and Niri events
+- **business.rs**: Implements core business logic with state management
+- **protocol.rs**: Defines command parsing and response formatting
+- **system_integration.rs**: Handles communication with the Niri window manager
+
+### State Management:
+- **Sticky Windows**: Windows that appear on every workspace
+- **Staged Windows**: Windows temporarily moved to a dedicated "stage" workspace
+- Atomic operations ensure state consistency during window management operations
+
+The daemon communicates with its CLI via a Unix Domain Socket at `/tmp/niri_sticky_cli.sock`.
+The daemon also listens to `niri`'s event stream to automatically handle window movement on workspace switches.
 
 ---
 
@@ -124,7 +146,7 @@ The daemon also listens to `niri`’s event stream to automatically handle windo
 🛠️ **Core Libraries:**
 
 - **Tokio:** Asynchronous runtime for smooth, non-blocking IO.
-- **Clap:** Robust command-line argument parser.
+- **Clap:** Robust command-line argument parser for structured commands.
 - **Anyhow:** Simplified error handling for better reliability.
 - **Serde / serde_json:** Efficient JSON serialization and deserialization.
 
@@ -139,6 +161,7 @@ The daemon also listens to `niri`’s event stream to automatically handle windo
 - `nsticky` relies on the `niri` window manager.
 - The daemon requires the `NIRI_SOCKET` environment variable to connect to Niri.
 - The staging feature moves windows to a workspace named "stage". Ensure this workspace exists in your Niri configuration, or it will be created automatically when needed.
+- Window IDs can be obtained using `niri msg --json windows`
 
 ---
 
