@@ -48,6 +48,18 @@ enum StickyAction {
     /// Toggle active window in sticky list
     #[command(alias = "t")]
     ToggleActive,
+    /// Toggle window by app ID in sticky list
+    #[command(alias = "ta")]
+    ToggleAppid {
+        /// Application ID to toggle
+        appid: String,
+    },
+    /// Toggle window by title in sticky list
+    #[command(alias = "tt")]
+    ToggleTitle {
+        /// Window title to toggle
+        title: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -70,6 +82,18 @@ enum StageAction {
     /// Toggle active window in stage
     #[command(alias = "t")]
     ToggleActive,
+    /// Toggle window by app ID in stage
+    #[command(alias = "ta")]
+    ToggleAppid {
+        /// Application ID to toggle
+        appid: String,
+    },
+    /// Toggle window by title in stage
+    #[command(alias = "tt")]
+    ToggleTitle {
+        /// Window title to toggle
+        title: String,
+    },
     /// Add all sticky windows to stage
     #[command(alias = "aa")]
     AddAll,
@@ -86,19 +110,23 @@ pub async fn run_cli() -> Result<()> {
     let (reader, mut writer) = stream.into_split();
     let mut reader = BufReader::new(reader);
 
-    // 根据子命令构造命令字符串
+    // Generate command string based on subcommand
     let cmd_str = match cli.command {
         Commands::Sticky { action } => match action {
             StickyAction::Add { window_id } => format!("add {window_id}\n"),
             StickyAction::Remove { window_id } => format!("remove {window_id}\n"),
             StickyAction::List => "list\n".to_string(),
             StickyAction::ToggleActive => "toggle_active\n".to_string(),
+            StickyAction::ToggleAppid { appid } => format!("toggle_appid {appid}\n"),
+            StickyAction::ToggleTitle { title } => format!("toggle_title \"{title}\"\n"),
         },
         Commands::Stage { action } => match action {
             StageAction::List => "stage --list\n".to_string(),
             StageAction::Add { window_id } => format!("stage {window_id}\n"),
             StageAction::Remove { window_id } => format!("unstage {window_id}\n"),
             StageAction::ToggleActive => "stage --active\n".to_string(),
+            StageAction::ToggleAppid { appid } => format!("stage --toggle-appid {appid}\n"),
+            StageAction::ToggleTitle { title } => format!("stage --toggle-title \"{title}\"\n"),
             StageAction::AddAll => "stage --all\n".to_string(),
             StageAction::RemoveAll => "unstage --all\n".to_string(),
         },

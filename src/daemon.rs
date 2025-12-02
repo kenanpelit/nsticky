@@ -61,7 +61,7 @@ async fn handle_cli_connection(stream: UnixStream, business_logic: BusinessLogic
     }
     let line = line.trim();
 
-    // 解析请求
+    // Parse request
     let request = match protocol::parse_request(line) {
         Ok(req) => req,
         Err(e) => {
@@ -72,7 +72,7 @@ async fn handle_cli_connection(stream: UnixStream, business_logic: BusinessLogic
         }
     };
 
-    // 处理请求并生成响应
+    // Process request and generate response
     let response = match request {
         protocol::Request::Add { window_id } => {
             match business_logic.add_sticky_window(window_id).await {
@@ -112,19 +112,33 @@ async fn handle_cli_connection(stream: UnixStream, business_logic: BusinessLogic
             }
             Err(e) => protocol::Response::Error(e.to_string()),
         },
+        protocol::Request::ToggleAppid { appid } => {
+            match business_logic.toggle_by_appid(&appid).await {
+                Ok(was_added) => {
+                    if was_added {
+                        protocol::Response::Success("Added window to sticky\n".to_string())
+                    } else {
+                        protocol::Response::Success("Removed window from sticky\n".to_string())
+                    }
+                }
+                Err(e) => protocol::Response::Error(e.to_string()),
+            }
+        }
+        protocol::Request::ToggleTitle { title } => {
+            match business_logic.toggle_by_title(&title).await {
+                Ok(was_added) => {
+                    if was_added {
+                        protocol::Response::Success("Added window to sticky\n".to_string())
+                    } else {
+                        protocol::Response::Success("Removed window from sticky\n".to_string())
+                    }
+                }
+                Err(e) => protocol::Response::Error(e.to_string()),
+            }
+        }
         protocol::Request::Stage(stage_args) => {
-            if stage_args.all {
-                match business_logic.stage_all_windows().await {
-                    Ok(count) => protocol::Response::Success(format!("Staged {} windows\n", count)),
-                    Err(e) => protocol::Response::Error(e.to_string()),
-                }
-            } else if stage_args.list {
-                match business_logic.list_staged_windows().await {
-                    Ok(windows) => protocol::Response::Data(format!("{:?}\n", windows)),
-                    Err(e) => protocol::Response::Error(e.to_string()),
-                }
-            } else if stage_args.active {
-                // 检查活动窗口是否已经在staged列表中，如果是则unstage，否则stage
+            if stage_args.active {
+                // Toggle active window stage status (unstage if staged, stage if sticky)
                 let active_id = match crate::system_integration::get_active_window_id().await {
                     Ok(id) => id,
                     Err(_) => {
@@ -154,6 +168,54 @@ async fn handle_cli_connection(stream: UnixStream, business_logic: BusinessLogic
                         Ok(()) => protocol::Response::Success("Staged active window\n".to_string()),
                         Err(e) => protocol::Response::Error(e.to_string()),
                     }
+                }
+            } else if let Some(appid) = stage_args.appid {
+                let current_ws_id = match crate::system_integration::get_active_workspace_id().await
+                {
+                    Ok(id) => id,
+                    Err(_) => {
+                        return Ok(writer
+                            .write_all(b"Failed to get active workspace ID\n")
+                            .await?);
+                    }
+                };
+                match business_logic
+                    .toggle_stage_by_appid(&appid, current_ws_id)
+                    .await
+                {
+                    Ok(()) => {
+                        protocol::Response::Success("Toggled stage status by app ID\n".to_string())
+                    }
+                    Err(e) => protocol::Response::Error(e.to_string()),
+                }
+            } else if let Some(title) = stage_args.title {
+                let current_ws_id = match crate::system_integration::get_active_workspace_id().await
+                {
+                    Ok(id) => id,
+                    Err(_) => {
+                        return Ok(writer
+                            .write_all(b"Failed to get active workspace ID\n")
+                            .await?);
+                    }
+                };
+                match business_logic
+                    .toggle_stage_by_title(&title, current_ws_id)
+                    .await
+                {
+                    Ok(()) => {
+                        protocol::Response::Success("Toggled stage status by title\n".to_string())
+                    }
+                    Err(e) => protocol::Response::Error(e.to_string()),
+                }
+            } else if stage_args.all {
+                match business_logic.stage_all_windows().await {
+                    Ok(count) => protocol::Response::Success(format!("Staged {} windows\n", count)),
+                    Err(e) => protocol::Response::Error(e.to_string()),
+                }
+            } else if stage_args.list {
+                match business_logic.list_staged_windows().await {
+                    Ok(windows) => protocol::Response::Data(format!("{:?}\n", windows)),
+                    Err(e) => protocol::Response::Error(e.to_string()),
                 }
             } else if let Some(window_id) = stage_args.window_id {
                 match business_logic.stage_window(window_id).await {
@@ -200,7 +262,7 @@ async fn handle_cli_connection(stream: UnixStream, business_logic: BusinessLogic
         }
     };
 
-    // 发送响应
+    // Send response
     let response_str = protocol::format_response(response);
     writer.write_all(response_str.as_bytes()).await?;
 

@@ -7,7 +7,15 @@ use tokio::{
     process::Command,
 };
 
-// 与Niri进行交互的函数
+/// Window information structure
+#[derive(Debug, Clone)]
+pub struct WindowInfo {
+    pub id: u64,
+    pub app_id: Option<String>,
+    pub title: Option<String>,
+}
+
+/// Get active workspace ID from Niri
 pub async fn get_active_workspace_id() -> Result<u64> {
     let output = tokio::process::Command::new("niri")
         .args(["msg", "-j", "workspaces"])
@@ -34,6 +42,7 @@ pub async fn get_active_workspace_id() -> Result<u64> {
     anyhow::bail!("Active workspace not found");
 }
 
+/// Get active window ID from Niri
 pub async fn get_active_window_id() -> Result<u64> {
     let output = tokio::process::Command::new("niri")
         .args(["msg", "--json", "focused-window"])
@@ -51,7 +60,8 @@ pub async fn get_active_window_id() -> Result<u64> {
     }
 }
 
-pub async fn get_full_window_list() -> Result<HashSet<u64>> {
+/// Get full window information from Niri
+async fn get_full_window_info() -> Result<Vec<WindowInfo>> {
     let output = Command::new("niri")
         .args(["msg", "--json", "windows"])
         .output()
@@ -61,17 +71,58 @@ pub async fn get_full_window_list() -> Result<HashSet<u64>> {
     }
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: Value = serde_json::from_str(&stdout)?;
-    let mut window_ids = HashSet::new();
+    let mut windows = Vec::new();
     if let Some(arr) = json.as_array() {
         for item in arr {
             if let Some(id) = item.get("id").and_then(|v| v.as_u64()) {
-                window_ids.insert(id);
+                let app_id = item
+                    .get("app_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let title = item
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                windows.push(WindowInfo { id, app_id, title });
             }
         }
     }
-    Ok(window_ids)
+    Ok(windows)
 }
 
+/// Get full window list from Niri
+pub async fn get_full_window_list() -> Result<HashSet<u64>> {
+    let windows = get_full_window_info().await?;
+    Ok(windows.into_iter().map(|w| w.id).collect())
+}
+
+/// Find window by application ID
+pub async fn find_window_by_appid(appid: &str) -> Result<Option<u64>> {
+    let windows = get_full_window_info().await?;
+    for window in windows {
+        if let Some(window_appid) = window.app_id
+            && window_appid == appid
+        {
+            return Ok(Some(window.id));
+        }
+    }
+    Ok(None)
+}
+
+/// Find window by title
+pub async fn find_window_by_title(title: &str) -> Result<Option<u64>> {
+    let windows = get_full_window_info().await?;
+    for window in windows {
+        if let Some(window_title) = window.title
+            && window_title.contains(title)
+        {
+            return Ok(Some(window.id));
+        }
+    }
+    Ok(None)
+}
+
+/// Move window to workspace
 pub async fn move_to_workspace(win_id: u64, ws_id: u64) -> Result<()> {
     let socket_path = std::env::var("NIRI_SOCKET")?;
 
@@ -99,6 +150,7 @@ pub async fn move_to_workspace(win_id: u64, ws_id: u64) -> Result<()> {
     Ok(())
 }
 
+/// Move window to named workspace
 pub async fn move_to_named_workspace(win_id: u64, workspace_name: &str) -> Result<()> {
     let socket_path = std::env::var("NIRI_SOCKET")?;
     let stream = UnixStream::connect(&socket_path).await?;

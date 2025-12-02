@@ -98,6 +98,8 @@ nsticky sticky add <window_id>          # Add a window to the sticky list
 nsticky sticky remove <window_id>       # Remove a window from the sticky list
 nsticky sticky list                     # List all sticky windows
 nsticky sticky toggle-active            # Toggle sticky state of the active window
+nsticky sticky toggle-appid <appid>     # Toggle sticky state of window by application ID
+nsticky sticky toggle-title <title>     # Toggle sticky state of window by title
 ```
 
 #### Stage Window Management:
@@ -106,6 +108,8 @@ nsticky stage list                      # List all currently staged windows
 nsticky stage add <window_id>           # Move a sticky window to the "stage" workspace
 nsticky stage remove <window_id>        # Move a staged window back to the current workspace
 nsticky stage toggle-active             # Toggle stage state of the active window (if in sticky, moves to stage; if in stage, moves back)
+nsticky stage toggle-appid <appid>        # Move window with app ID to stage (if sticky) or back to current workspace (if staged)
+nsticky stage toggle-title <title>        # Move window with title to stage (if sticky) or back to current workspace (if staged)
 nsticky stage add-all                   # Move all sticky windows to the "stage" workspace
 nsticky stage remove-all                # Move all staged windows back to the current workspace
 ```
