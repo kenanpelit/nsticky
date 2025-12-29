@@ -2,6 +2,8 @@
 
 `nsticky` is a window management helper tool built on top of [niri](https://github.com/YaLTeR/niri). It focuses on managing **sticky windows** — windows fixed across all workspaces — and **staged windows** — windows temporarily moved to a dedicated workspace — to enhance your workflow efficiency.
 
+> Note: This repository is a fork of `lonerOrz/nsticky` used in kenanpelit's NixOS setup.
+
 ## Why?
 
 Niri doesn't natively support global sticky windows.
@@ -36,42 +38,20 @@ Make sure you have Rust installed along with the required `niri` tool.
 ### 1. Build from source
 
 ```bash
-git clone https://github.com/lonerOrz/nsticky.git
+git clone https://github.com/kenanpelit/nsticky.git
 cd nsticky
 cargo build --release
 ```
 
 ### 2. Install via Nix (for Nix or NixOS users)
 
-```bash
-{
-  inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-    nsticky.url = "github:lonerOrz/nsticky";
-  };
+Add this to your flake inputs:
 
-  outputs =
-    inputs@{
-      self,
-      flake-utils,
-      nixpkgs,
-      ...
-    }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-        };
-      in
-      {
-        devShells.default = pkgs.mkShell {
-          packages = [ inputs.nsticky.packages.${system}.nsticky ];
-        };
-      }
-    );
-}
+```nix
+inputs.nsticky = {
+  url = "github:kenanpelit/nsticky";
+  inputs.nixpkgs.follows = "nixpkgs";
+};
 ```
 
 ### 3. Use precompiled binaries directly
@@ -107,18 +87,28 @@ nsticky sticky toggle-title <title>     # Toggle sticky state of window by title
 nsticky stage list                      # List all currently staged windows
 nsticky stage add <window_id>           # Move a sticky window to the "stage" workspace
 nsticky stage remove <window_id>        # Move a staged window back to the current workspace
-nsticky stage toggle-active             # Toggle stage state of the active window (if in sticky, moves to stage; if in stage, moves back)
+nsticky stage toggle-active             # Cycle active window: normal -> sticky -> stage -> sticky
 nsticky stage toggle-appid <appid>        # Move window with app ID to stage (if sticky) or back to current workspace (if staged)
 nsticky stage toggle-title <title>        # Move window with title to stage (if sticky) or back to current workspace (if staged)
 nsticky stage add-all                   # Move all sticky windows to the "stage" workspace
 nsticky stage remove-all                # Move all staged windows back to the current workspace
 ```
 
+#### One-key sticky ↔ stage cycle (active window)
+`nsticky stage toggle-active` cycles the active window like this:
+
+- Normal window → add to sticky
+- Sticky window → move to `stage`
+- Staged window → move back to current workspace (and keep sticky)
+
+To remove stickiness entirely, use `nsticky sticky toggle-active`.
+
 You can set up shortcuts in `niri`:
 
 ```bash
-Mod+Ctrl+Space { spawn "nsticky" "sticky" "toggle-active"; }
-Mod+Shift+Space { spawn "nsticky" "stage" "toggle-active"; }
+Mod+Ctrl+S { spawn "nsticky" "stage" "toggle-active"; }
+# Optional: remove sticky (back to normal)
+Mod+Ctrl+Shift+S { spawn "nsticky" "sticky" "toggle-active"; }
 ```
 
 ---
