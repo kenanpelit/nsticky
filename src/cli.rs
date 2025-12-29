@@ -79,7 +79,7 @@ enum StageAction {
         /// Window ID to unstage
         window_id: u64,
     },
-    /// Toggle active window in stage
+    /// Toggle active window stage status (stage/unstage; makes sticky if needed)
     #[command(alias = "t")]
     ToggleActive,
     /// Toggle window by app ID in stage

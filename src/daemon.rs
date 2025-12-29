@@ -138,7 +138,10 @@ async fn handle_cli_connection(stream: UnixStream, business_logic: BusinessLogic
         }
         protocol::Request::Stage(stage_args) => {
             if stage_args.active {
-                // Toggle active window stage status (unstage if staged, stage if sticky)
+                // Cycle active window state:
+                // - staged -> unstage
+                // - sticky -> stage
+                // - normal -> make sticky
                 let active_id = match crate::system_integration::get_active_window_id().await {
                     Ok(id) => id,
                     Err(_) => {
@@ -164,9 +167,21 @@ async fn handle_cli_connection(stream: UnixStream, business_logic: BusinessLogic
                         Err(e) => protocol::Response::Error(e.to_string()),
                     }
                 } else {
-                    match business_logic.stage_active_window().await {
-                        Ok(()) => protocol::Response::Success("Staged active window\n".to_string()),
-                        Err(e) => protocol::Response::Error(e.to_string()),
+                    let is_sticky = business_logic.is_window_sticky(active_id).await;
+                    if is_sticky {
+                        match business_logic.stage_window(active_id).await {
+                            Ok(()) => {
+                                protocol::Response::Success("Staged active window\n".to_string())
+                            }
+                            Err(e) => protocol::Response::Error(e.to_string()),
+                        }
+                    } else {
+                        match business_logic.add_sticky_window(active_id).await {
+                            Ok(_) => protocol::Response::Success(
+                                "Added active window to sticky\n".to_string(),
+                            ),
+                            Err(e) => protocol::Response::Error(e.to_string()),
+                        }
                     }
                 }
             } else if let Some(appid) = stage_args.appid {

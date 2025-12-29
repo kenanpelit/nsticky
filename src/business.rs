@@ -380,6 +380,12 @@ impl BusinessLogic {
         staged.contains(&window_id)
     }
 
+    /// Check if window is sticky
+    pub async fn is_window_sticky(&self, window_id: u64) -> bool {
+        let sticky = self.sticky_windows.lock().await;
+        sticky.contains(&window_id)
+    }
+
     /// Stage all sticky windows
     pub async fn stage_all_windows(&self) -> Result<usize> {
         let sticky_ids = self.sticky_windows.lock().await.clone();
